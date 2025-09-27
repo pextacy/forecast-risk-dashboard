@@ -51,7 +51,7 @@ Unlike black-box financial models, this project emphasizes **clarity, transparen
 - **Data Sources (Real APIs)**:
   - [Yahoo Finance](https://pypi.org/project/yfinance/) (stocks, FX, indices)
   - [Alpha Vantage](https://www.alphavantage.co/) (global equities, FX, crypto)
-  - [CoinGecko](https://www.coingecko.com/en/api) (crypto assets, volatility data)
+  - [dexscreener]() (crypto assets, volatility data)
 - **Visualization**:
   - `Plotly` for interactive charts
   - `Matplotlib` for performance reports

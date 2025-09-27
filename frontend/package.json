@@ -1,0 +1,54 @@
+{
+  "name": "treasury-risk-dashboard",
+  "version": "1.0.0",
+  "description": "AI-powered treasury management dashboard with forecasting and risk analytics",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.0.4",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "typescript": "5.3.3",
+    "@types/react": "18.2.45",
+    "@types/react-dom": "18.2.18",
+    "@types/node": "20.10.6",
+    "recharts": "2.8.0",
+    "plotly.js": "2.27.1",
+    "react-plotly.js": "2.6.0",
+    "@types/plotly.js": "2.12.29",
+    "axios": "1.6.2",
+    "swr": "2.2.4",
+    "date-fns": "2.30.0",
+    "lucide-react": "0.294.0",
+    "clsx": "2.0.0",
+    "tailwind-merge": "2.2.0",
+    "@headlessui/react": "1.7.17",
+    "@heroicons/react": "2.0.18",
+    "framer-motion": "10.16.16",
+    "react-hot-toast": "2.4.1",
+    "react-hook-form": "7.48.2",
+    "zod": "3.22.4",
+    "@hookform/resolvers": "3.3.2",
+    "numeral": "2.0.6",
+    "@types/numeral": "2.0.5"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.3.6",
+    "postcss": "8.4.32",
+    "autoprefixer": "10.4.16",
+    "eslint": "8.56.0",
+    "eslint-config-next": "14.0.4",
+    "@tailwindcss/forms": "0.5.7",
+    "@tailwindcss/typography": "0.5.10"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

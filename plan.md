@@ -11,7 +11,7 @@ Forecast & Risk Dashboard — Development Plan with File Structure
 - *ML Forecasting:* Statsmodels (ARIMA/Prophet optional), Scikit-learn (volatility modeling), SHAP (explainability)  
 - *Frontend:* Next.js + Tailwind + Recharts/Plotly (charts)  
 - *Treasury Integrations:*  
-  - CoinGecko (price/time-series)  
+  - dexscreener(price/time-series)  
   - Gnosis Safe Transaction Service API (treasury balances)  
   - Midnight.js (privacy-focused transactions)  
 
