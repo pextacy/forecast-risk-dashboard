@@ -1,8 +1,22 @@
-# Forecast & Risk Dashboard (Treasury ML)
+# 🏦 Treasury Risk Dashboard
 
-## 📌 Overview
-**Forecast & Risk Dashboard** is an AI-powered treasury management tool that helps businesses and funds forecast cashflows, measure volatility, and receive explainable hedging suggestions.  
-Unlike black-box financial models, this project emphasizes **clarity, transparency, and real-world execution** — providing forecasts alongside plain-language AI narratives.
+**AI-Powered Treasury Management for DAOs**
+
+*Built for the DEGA Hackathon: AI for DAO Treasury Management on Midnight*
+
+---
+
+## 🎯 Overview
+
+The Treasury Risk Dashboard is a comprehensive, AI-powered solution for DAO treasury management. It combines advanced machine learning forecasting models with real-time risk analysis and intelligent hedging strategies, all wrapped in an intuitive web interface with plain-language AI explanations.
+
+### 🌟 Why This Stands Out
+
+- **Real ML Models**: Uses ARIMA, Prophet, GARCH, and LSTM - not mocks
+- **AI Explanations**: DEGA AI MCP integration for plain-language insights
+- **Production-Ready**: TimescaleDB, real data sources, comprehensive API
+- **Strong Demo Potential**: Visual forecasts + narrated AI rationale
+- **Hackathon-Perfect**: 30-day volatility forecasts with one-click optimization
 
 ---
 
