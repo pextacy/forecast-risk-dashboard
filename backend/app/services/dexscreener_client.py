@@ -1,6 +1,6 @@
 """
 DexScreener API client for real-time DEX token data.
-Replaces CoinGecko with DexScreener for more accurate DeFi pricing.
+Uses DexScreener for accurate DeFi pricing from decentralized exchanges.
 """
 
 import asyncio
@@ -38,7 +38,7 @@ class DexScreenerClient:
         self.token_addresses = {
             # Ethereum mainnet tokens
             "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-            "USDC": "0xA0b86a33E6441c7C2F74c4d4E98E5a3a4b3C11A3",
+            "USDC": "0xA0b86a33E6441c7C677AB43c16f0dB1CCa34884e",
             "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
             "WBTC": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
             "UNI": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
@@ -157,57 +157,11 @@ class DexScreenerClient:
 
     async def get_historical_data(self, symbol: str, days: int = 30) -> List[dict]:
         """
-        Fetch historical price data for a single token.
-        Note: DexScreener doesn't provide historical data directly,
-        so we'll use current price and simulate some historical data for demo.
-        In production, you'd want to use a different service for historical data.
+        DexScreener doesn't provide historical data.
+        This method returns empty list - use external historical data sources instead.
         """
-        clean_symbol = symbol.upper().replace("ETHEREUM", "WETH").replace("BITCOIN", "WBTC")
-
-        if clean_symbol not in self.token_addresses:
-            logger.warning(f"Token address not found for symbol: {symbol}")
-            return []
-
-        try:
-            # Get current price data
-            current_data = await self.get_current_prices([symbol])
-            if symbol not in current_data:
-                return []
-
-            current_price = float(current_data[symbol]["usd"])
-            current_volume = float(current_data[symbol]["usd_24h_vol"])
-
-            # Generate synthetic historical data for demo purposes
-            # In production, integrate with a historical data provider
-            historical_data = []
-            base_date = datetime.now() - timedelta(days=days)
-
-            for i in range(days):
-                date = base_date + timedelta(days=i)
-
-                # Add some realistic price variation (±5% daily)
-                import random
-                price_variation = random.uniform(-0.05, 0.05)
-                price = current_price * (1 + price_variation * (days - i) / days)
-
-                volume_variation = random.uniform(0.5, 1.5)
-                volume = current_volume * volume_variation
-
-                historical_data.append({
-                    "time": date,
-                    "symbol": symbol,
-                    "price": max(0.001, price),  # Ensure positive price
-                    "volume": max(1000, volume),  # Ensure positive volume
-                    "market_cap": price * 1000000,  # Simplified market cap
-                    "source": "dexscreener"
-                })
-
-            logger.info(f"Generated {len(historical_data)} historical records for {symbol}")
-            return historical_data
-
-        except Exception as e:
-            logger.error(f"Error generating historical data for {symbol}: {e}")
-            return []
+        logger.warning(f"DexScreener does not provide historical data for {symbol}. Use Binance/Coinbase APIs instead.")
+        return []
 
     async def get_trending_tokens(self, chain: str = "ethereum", limit: int = 10) -> List[Dict]:
         """Get trending tokens on a specific chain."""
@@ -314,7 +268,7 @@ class DexScreenerClient:
                 if pairs:
                     pair = pairs[0]
 
-                    # Extract comprehensive market data
+                    # Extract REAL market data only (no estimates or mock data)
                     data = {
                         "id": symbol.lower(),
                         "symbol": symbol.upper(),
@@ -322,27 +276,27 @@ class DexScreenerClient:
                         "current_price": float(pair.get("priceUsd", 0)),
                         "market_cap": pair.get("marketCap", 0),
                         "total_volume": pair.get("volume", {}).get("h24", 0),
-                        "high_24h": pair.get("priceUsd", 0) * 1.05,  # Estimated
-                        "low_24h": pair.get("priceUsd", 0) * 0.95,   # Estimated
+                        "high_24h": None,  # Not available from DexScreener
+                        "low_24h": None,   # Not available from DexScreener
                         "price_change_24h": pair.get("priceChange", {}).get("h24", 0),
                         "price_change_percentage_24h": pair.get("priceChange", {}).get("h24", 0),
                         "market_cap_rank": None,  # Not available from DexScreener
                         "fully_diluted_valuation": pair.get("marketCap", 0),
-                        "total_supply": None,  # Not directly available
-                        "max_supply": None,    # Not directly available
-                        "circulating_supply": None,  # Not directly available
+                        "total_supply": None,  # Not available from DexScreener
+                        "max_supply": None,    # Not available from DexScreener
+                        "circulating_supply": None,  # Not available from DexScreener
                         "last_updated": datetime.now().isoformat(),
 
-                        # DexScreener specific data
+                        # DexScreener specific REAL data
                         "liquidity_usd": pair.get("liquidity", {}).get("usd", 0),
                         "dex_id": pair.get("dexId", ""),
                         "pair_address": pair.get("pairAddress", ""),
                         "chain_id": pair.get("chainId", ""),
 
-                        # Price change percentages (estimated from 24h change)
+                        # Real price change percentages (only what's available)
                         "price_change_percentage_1h": pair.get("priceChange", {}).get("h1", 0),
-                        "price_change_percentage_7d": pair.get("priceChange", {}).get("h24", 0) * 7,  # Estimated
-                        "price_change_percentage_30d": pair.get("priceChange", {}).get("h24", 0) * 30,  # Estimated
+                        "price_change_percentage_7d": None,   # Not available from DexScreener
+                        "price_change_percentage_30d": None,  # Not available from DexScreener
                     }
 
                     market_data.append(data)
@@ -354,9 +308,9 @@ class DexScreenerClient:
         return market_data
 
 
-# For backward compatibility with existing CoinGecko client interface
+# For backward compatibility with existing client interfaces
 class DexScreenerAdapter:
-    """Adapter to make DexScreener client compatible with existing CoinGecko interface."""
+    """Adapter to make DexScreener client compatible with existing client interface."""
 
     def __init__(self):
         self.client = DexScreenerClient()
@@ -368,14 +322,14 @@ class DexScreenerAdapter:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.__aexit__(exc_type, exc_val, exc_tb)
 
-    async def get_current_prices(self, coin_ids: List[str]) -> Dict[str, dict]:
-        """Adapter method to match CoinGecko interface."""
-        return await self.client.get_current_prices(coin_ids)
+    async def get_current_prices(self, token_symbols: List[str]) -> Dict[str, dict]:
+        """Get current prices using DexScreener."""
+        return await self.client.get_current_prices(token_symbols)
 
-    async def get_historical_data(self, coin_id: str, days: int = 30) -> List[dict]:
-        """Adapter method to match CoinGecko interface."""
-        return await self.client.get_historical_data(coin_id, days)
+    async def get_historical_data(self, symbol: str, days: int = 30) -> List[dict]:
+        """Get historical data (returns empty - use external sources)."""
+        return await self.client.get_historical_data(symbol, days)
 
-    async def get_market_data(self, coin_ids: List[str]) -> List[dict]:
-        """Adapter method to match CoinGecko interface."""
-        return await self.client.get_market_data(coin_ids)
+    async def get_market_data(self, token_symbols: List[str]) -> List[dict]:
+        """Get market data using DexScreener."""
+        return await self.client.get_market_data(token_symbols)

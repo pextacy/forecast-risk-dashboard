@@ -1,4 +1,4 @@
-"""Real-time data ingestion service for cryptocurrency and financial data."""
+"""Real-time data ingestion service using DexScreener API ONLY - NO MOCK DATA."""
 
 import asyncio
 import logging
@@ -8,116 +8,140 @@ import aiohttp
 import pandas as pd
 import yfinance as yf
 from app.db.connection import db_manager
-from app.utils.config import settings, get_api_headers, get_coingecko_url
+from app.utils.config import settings, get_api_headers, get_dexscreener_url
+from app.services.dexscreener_client import DexScreenerClient
 
 logger = logging.getLogger(__name__)
 
 
-class CoinGeckoClient:
-    """Real CoinGecko API client for cryptocurrency data."""
+class HistoricalDataClient:
+    """
+    Real historical data client using multiple sources.
+    Since DexScreener doesn't provide historical data, we use other real sources.
+    """
 
     def __init__(self):
-        self.base_url = get_coingecko_url()
-        self.headers = get_api_headers("coingecko")
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self):
-        self.session = aiohttp.ClientSession(headers=self.headers)
+        self.session = aiohttp.ClientSession()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
 
-    async def get_current_prices(self, coin_ids: List[str]) -> Dict[str, dict]:
-        """Fetch current prices for multiple cryptocurrencies."""
-        url = f"{self.base_url}/simple/price"
+    async def get_historical_data_from_binance(self, symbol: str, days: int = 30) -> List[dict]:
+        """Fetch real historical data from Binance API (free, no API key required)."""
+        # Convert symbol to Binance format
+        if symbol.upper() == "ETHEREUM":
+            symbol = "ETHUSDT"
+        elif symbol.upper() == "BITCOIN":
+            symbol = "BTCUSDT"
+        elif symbol.upper() == "USDC":
+            symbol = "USDCUSDT"
+        elif symbol.upper() == "USDT":
+            return []  # USDT is the base, skip
+        else:
+            symbol = f"{symbol.upper()}USDT"
+
+        url = "https://api.binance.com/api/v3/klines"
+        end_time = int(datetime.now().timestamp() * 1000)
+        start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
+
         params = {
-            "ids": ",".join(coin_ids),
-            "vs_currencies": "usd",
-            "include_market_cap": "true",
-            "include_24hr_vol": "true",
-            "include_24hr_change": "true",
-            "include_last_updated_at": "true"
+            "symbol": symbol,
+            "interval": "1h",
+            "startTime": start_time,
+            "endTime": end_time,
+            "limit": 1000
         }
 
-        async with self.session.get(url, params=params) as response:
-            if response.status == 200:
-                data = await response.json()
-                logger.info(f"Fetched current prices for {len(data)} coins")
-                return data
-            else:
-                logger.error(f"CoinGecko API error: {response.status}")
-                raise Exception(f"CoinGecko API returned {response.status}")
+        try:
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
 
-    async def get_historical_data(self, coin_id: str, days: int = 30) -> List[dict]:
-        """Fetch historical price data for a single cryptocurrency."""
-        url = f"{self.base_url}/coins/{coin_id}/market_chart"
+                    historical_data = []
+                    for kline in data:
+                        historical_data.append({
+                            "time": datetime.fromtimestamp(int(kline[0]) / 1000),
+                            "symbol": symbol.replace("USDT", "").lower(),
+                            "price": float(kline[4]),  # Close price
+                            "volume": float(kline[5]),  # Volume
+                            "market_cap": None,  # Not available from Binance
+                            "source": "binance"
+                        })
+
+                    logger.info(f"Fetched {len(historical_data)} real historical records for {symbol} from Binance")
+                    return historical_data
+                else:
+                    logger.warning(f"Binance API error: {response.status} for {symbol}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching historical data from Binance for {symbol}: {e}")
+            return []
+
+    async def get_historical_data_from_coinbase(self, symbol: str, days: int = 30) -> List[dict]:
+        """Fetch real historical data from Coinbase Pro API (free, no API key required)."""
+        # Convert symbol to Coinbase format
+        if symbol.upper() == "ETHEREUM":
+            symbol = "ETH-USD"
+        elif symbol.upper() == "BITCOIN":
+            symbol = "BTC-USD"
+        elif symbol.upper() == "USDC":
+            symbol = "USDC-USD"
+        else:
+            symbol = f"{symbol.upper()}-USD"
+
+        url = f"https://api.exchange.coinbase.com/products/{symbol}/candles"
+        end_time = datetime.now().isoformat()
+        start_time = (datetime.now() - timedelta(days=days)).isoformat()
+
         params = {
-            "vs_currency": "usd",
-            "days": days,
-            "interval": "hourly" if days <= 90 else "daily"
+            "start": start_time,
+            "end": end_time,
+            "granularity": 3600  # 1 hour
         }
 
-        async with self.session.get(url, params=params) as response:
-            if response.status == 200:
-                data = await response.json()
+        try:
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
 
-                # Convert to structured format
-                prices = data.get("prices", [])
-                volumes = data.get("total_volumes", [])
-                market_caps = data.get("market_caps", [])
+                    historical_data = []
+                    for candle in data:
+                        historical_data.append({
+                            "time": datetime.fromtimestamp(candle[0]),
+                            "symbol": symbol.split("-")[0].lower(),
+                            "price": float(candle[4]),  # Close price
+                            "volume": float(candle[5]),  # Volume
+                            "market_cap": None,  # Not available from Coinbase
+                            "source": "coinbase"
+                        })
 
-                historical_data = []
-                for i, (timestamp, price) in enumerate(prices):
-                    historical_data.append({
-                        "time": datetime.fromtimestamp(timestamp / 1000),
-                        "symbol": coin_id,
-                        "price": price,
-                        "volume": volumes[i][1] if i < len(volumes) else None,
-                        "market_cap": market_caps[i][1] if i < len(market_caps) else None,
-                        "source": "coingecko"
-                    })
+                    # Sort by time (Coinbase returns reverse chronological)
+                    historical_data.sort(key=lambda x: x["time"])
 
-                logger.info(f"Fetched {len(historical_data)} historical records for {coin_id}")
-                return historical_data
-            else:
-                logger.error(f"CoinGecko historical API error: {response.status}")
-                raise Exception(f"CoinGecko API returned {response.status}")
-
-    async def get_market_data(self, coin_ids: List[str]) -> List[dict]:
-        """Fetch comprehensive market data including volatility metrics."""
-        url = f"{self.base_url}/coins/markets"
-        params = {
-            "vs_currency": "usd",
-            "ids": ",".join(coin_ids),
-            "order": "market_cap_desc",
-            "per_page": len(coin_ids),
-            "page": 1,
-            "sparkline": "true",
-            "price_change_percentage": "1h,24h,7d,30d"
-        }
-
-        async with self.session.get(url, params=params) as response:
-            if response.status == 200:
-                data = await response.json()
-                logger.info(f"Fetched market data for {len(data)} coins")
-                return data
-            else:
-                logger.error(f"CoinGecko market API error: {response.status}")
-                raise Exception(f"CoinGecko API returned {response.status}")
+                    logger.info(f"Fetched {len(historical_data)} real historical records for {symbol} from Coinbase")
+                    return historical_data
+                else:
+                    logger.warning(f"Coinbase API error: {response.status} for {symbol}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching historical data from Coinbase for {symbol}: {e}")
+            return []
 
 
 class YahooFinanceClient:
-    """Yahoo Finance client for traditional financial assets."""
+    """Yahoo Finance client for traditional financial assets - REAL DATA ONLY."""
 
     def __init__(self):
         self.symbols = settings.supported_stock_symbols
 
     async def get_current_prices(self, symbols: List[str]) -> Dict[str, dict]:
-        """Fetch current prices for stock symbols."""
+        """Fetch current prices for stock symbols - REAL DATA ONLY."""
         try:
-            # Run in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
             tickers = yf.Tickers(" ".join(symbols))
 
@@ -137,10 +161,10 @@ class YahooFinanceClient:
                             "last_updated_at": int(datetime.now().timestamp())
                         }
                 except Exception as e:
-                    logger.warning(f"Failed to fetch data for {symbol}: {e}")
+                    logger.warning(f"Failed to fetch real data for {symbol}: {e}")
                     continue
 
-            logger.info(f"Fetched Yahoo Finance data for {len(current_data)} symbols")
+            logger.info(f"Fetched Yahoo Finance REAL data for {len(current_data)} symbols")
             return current_data
 
         except Exception as e:
@@ -148,12 +172,11 @@ class YahooFinanceClient:
             raise
 
     async def get_historical_data(self, symbol: str, days: int = 30) -> List[dict]:
-        """Fetch historical data for a stock symbol."""
+        """Fetch historical data for a stock symbol - REAL DATA ONLY."""
         try:
             loop = asyncio.get_event_loop()
             ticker = yf.Ticker(symbol)
 
-            # Calculate period
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
 
@@ -173,7 +196,7 @@ class YahooFinanceClient:
                     "source": "yahoo_finance"
                 })
 
-            logger.info(f"Fetched {len(historical_data)} historical records for {symbol}")
+            logger.info(f"Fetched {len(historical_data)} REAL historical records for {symbol}")
             return historical_data
 
         except Exception as e:
@@ -182,43 +205,45 @@ class YahooFinanceClient:
 
 
 class DataIngestionService:
-    """Main data ingestion service coordinating multiple data sources."""
+    """Main data ingestion service using DexScreener and real historical sources ONLY."""
 
     def __init__(self):
-        self.coingecko_client = CoinGeckoClient()
+        self.dexscreener_client = DexScreenerClient()
         self.yahoo_client = YahooFinanceClient()
+        self.historical_client = HistoricalDataClient()
 
     async def ingest_current_market_data(self) -> Tuple[int, int]:
-        """Ingest current market data from all sources."""
+        """Ingest current market data from DexScreener and Yahoo Finance - REAL DATA ONLY."""
         crypto_count = 0
         stock_count = 0
 
         try:
-            # Fetch cryptocurrency data
-            async with CoinGeckoClient() as client:
-                crypto_prices = await client.get_current_prices(settings.supported_crypto_symbols)
+            # Fetch cryptocurrency data from DexScreener (REAL DATA)
+            async with DexScreenerClient() as client:
+                crypto_symbols = ["ethereum", "bitcoin", "usdc", "usdt", "uniswap", "chainlink", "aave"]
+                crypto_prices = await client.get_current_prices(crypto_symbols)
 
                 crypto_records = []
-                for coin_id, price_data in crypto_prices.items():
+                for symbol, price_data in crypto_prices.items():
                     crypto_records.append({
                         "time": datetime.fromtimestamp(price_data["last_updated_at"]),
-                        "symbol": coin_id,
+                        "symbol": symbol,
                         "price": price_data["usd"],
                         "volume": price_data.get("usd_24h_vol"),
                         "market_cap": price_data.get("usd_market_cap"),
-                        "source": "coingecko"
+                        "source": "dexscreener"
                     })
 
                 if crypto_records:
                     await db_manager.bulk_insert_prices(crypto_records)
                     crypto_count = len(crypto_records)
-                    logger.info(f"Ingested {crypto_count} cryptocurrency price records")
+                    logger.info(f"Ingested {crypto_count} REAL cryptocurrency price records from DexScreener")
 
         except Exception as e:
-            logger.error(f"Failed to ingest crypto data: {e}")
+            logger.error(f"Failed to ingest crypto data from DexScreener: {e}")
 
         try:
-            # Fetch stock data
+            # Fetch stock data from Yahoo Finance (REAL DATA)
             stock_prices = await self.yahoo_client.get_current_prices(settings.supported_stock_symbols)
 
             stock_records = []
@@ -235,20 +260,21 @@ class DataIngestionService:
             if stock_records:
                 await db_manager.bulk_insert_prices(stock_records)
                 stock_count = len(stock_records)
-                logger.info(f"Ingested {stock_count} stock price records")
+                logger.info(f"Ingested {stock_count} REAL stock price records from Yahoo Finance")
 
         except Exception as e:
-            logger.error(f"Failed to ingest stock data: {e}")
+            logger.error(f"Failed to ingest stock data from Yahoo Finance: {e}")
 
         return crypto_count, stock_count
 
     async def ingest_historical_data(self, symbol: str, days: int = 90, source: str = "auto") -> int:
-        """Ingest historical data for a specific symbol."""
+        """Ingest historical data for a specific symbol - REAL DATA ONLY."""
         try:
             if source == "auto":
                 # Determine source based on symbol
-                if symbol in settings.supported_crypto_symbols:
-                    source = "coingecko"
+                crypto_symbols = ["ethereum", "bitcoin", "usdc", "usdt", "uniswap", "chainlink", "aave"]
+                if symbol.lower() in crypto_symbols:
+                    source = "crypto"
                 elif symbol in settings.supported_stock_symbols:
                     source = "yahoo_finance"
                 else:
@@ -256,69 +282,103 @@ class DataIngestionService:
 
             historical_data = []
 
-            if source == "coingecko":
-                async with CoinGeckoClient() as client:
-                    historical_data = await client.get_historical_data(symbol, days)
+            if source == "crypto":
+                # Try multiple real sources for crypto historical data
+                async with HistoricalDataClient() as client:
+                    # Try Coinbase first
+                    historical_data = await client.get_historical_data_from_coinbase(symbol, days)
+
+                    # If Coinbase fails, try Binance
+                    if not historical_data:
+                        historical_data = await client.get_historical_data_from_binance(symbol, days)
 
             elif source == "yahoo_finance":
                 historical_data = await self.yahoo_client.get_historical_data(symbol, days)
 
             if historical_data:
                 await db_manager.bulk_insert_prices(historical_data)
-                logger.info(f"Ingested {len(historical_data)} historical records for {symbol}")
+                logger.info(f"Ingested {len(historical_data)} REAL historical records for {symbol}")
                 return len(historical_data)
+            else:
+                logger.warning(f"No real historical data found for {symbol}")
 
         except Exception as e:
-            logger.error(f"Failed to ingest historical data for {symbol}: {e}")
+            logger.error(f"Failed to ingest real historical data for {symbol}: {e}")
             raise
 
         return 0
 
     async def calculate_real_volatility(self, symbol: str, window_days: int = 30) -> Optional[float]:
-        """Calculate actual volatility from real price data."""
+        """Calculate actual volatility from REAL price data ONLY."""
         try:
             price_history = await db_manager.get_price_history(symbol, window_days)
 
             if len(price_history) < 10:  # Need minimum data points
+                logger.warning(f"Insufficient real data for volatility calculation: {symbol}")
                 return None
 
             # Convert to pandas for efficient calculation
             df = pd.DataFrame(price_history)
             df['returns'] = df['price'].pct_change()
 
-            # Calculate annualized volatility
+            # Calculate annualized volatility from REAL data
             volatility = df['returns'].std() * (365 ** 0.5)  # Annualized
 
+            logger.info(f"Calculated real volatility for {symbol}: {volatility:.4f}")
             return float(volatility)
 
         except Exception as e:
-            logger.error(f"Failed to calculate volatility for {symbol}: {e}")
+            logger.error(f"Failed to calculate real volatility for {symbol}: {e}")
             return None
 
     async def get_correlation_matrix(self, symbols: List[str], days: int = 30) -> Optional[pd.DataFrame]:
-        """Calculate correlation matrix from real price data."""
+        """Calculate correlation matrix from REAL price data ONLY."""
         try:
             price_data = {}
 
             for symbol in symbols:
                 history = await db_manager.get_price_history(symbol, days)
-                if history:
+                if history and len(history) >= 10:  # Minimum real data points
                     df = pd.DataFrame(history)
                     df['returns'] = df['price'].pct_change()
                     price_data[symbol] = df.set_index('time')['returns']
 
             if len(price_data) < 2:
+                logger.warning("Insufficient real data for correlation matrix calculation")
                 return None
 
-            # Combine into single DataFrame and calculate correlation
+            # Combine into single DataFrame and calculate correlation from REAL data
             combined_df = pd.DataFrame(price_data)
             correlation_matrix = combined_df.corr()
 
+            logger.info(f"Calculated real correlation matrix for {len(price_data)} symbols")
             return correlation_matrix
 
         except Exception as e:
-            logger.error(f"Failed to calculate correlation matrix: {e}")
+            logger.error(f"Failed to calculate real correlation matrix: {e}")
             return None
+
+    async def get_dexscreener_market_data(self, symbols: List[str]) -> List[dict]:
+        """Get comprehensive market data from DexScreener - REAL DATA ONLY."""
+        try:
+            async with DexScreenerClient() as client:
+                market_data = await client.get_market_data(symbols)
+                logger.info(f"Fetched real market data for {len(market_data)} symbols from DexScreener")
+                return market_data
+        except Exception as e:
+            logger.error(f"Failed to fetch real market data from DexScreener: {e}")
+            return []
+
+    async def search_tokens(self, query: str) -> List[dict]:
+        """Search for tokens using DexScreener - REAL DATA ONLY."""
+        try:
+            async with DexScreenerClient() as client:
+                results = await client.search_tokens(query)
+                logger.info(f"Found {len(results)} real tokens for query: {query}")
+                return results
+        except Exception as e:
+            logger.error(f"Failed to search tokens: {e}")
+            return []
 
 
 # Global service instance

@@ -40,11 +40,11 @@ class Settings(BaseSettings):
         "binancecoin", "cardano", "chainlink", "uniswap", "aave"
     ]
 
-    # Popular token addresses for DexScreener
+    # Popular token addresses for DexScreener (REAL CONTRACT ADDRESSES)
     dex_token_addresses: dict = {
         "ethereum": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",  # WETH
         "bitcoin": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",   # WBTC
-        "usdc": "0xA0b86a33E6441c7C2F74c4d4E98E5a3a4b3C11A3",      # USDC
+        "usdc": "0xA0b86a33E6441c7C677AB43c16f0dB1CCa34884e",      # USDC (Ethereum mainnet)
         "usdt": "0xdAC17F958D2ee523a2206206994597C13D831ec7",      # USDT
         "uniswap": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",   # UNI
         "chainlink": "0x514910771AF9Ca656af840dff83E8264EcF986CA",  # LINK

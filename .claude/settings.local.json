@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(grep:*)",
+      "Bash(python test_dexscreener.py:*)",
+      "Bash(pip install:*)",
+      "Bash(python test_simple_dexscreener.py)",
+      "Bash(npm run type-check:*)",
+      "Bash(python test:*)",
+      "Bash(find:*)",
+      "Read(//c/Users/cmert/OneDrive/Masaüstü/**)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

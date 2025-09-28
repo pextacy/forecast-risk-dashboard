@@ -106,24 +106,6 @@ The Treasury Risk Dashboard is a comprehensive, AI-powered solution for DAO trea
 - **Software Engineer** → FastAPI backend, Next.js frontend, real-time data pipelines.  
 - **(Optional)** Risk Analyst → Translate AI output into finance-team-ready language.  
 
----
 
-## 🛣️ Roadmap
-### Phase 1 (MVP - 2 months)
-- CSV upload + forecast (ARIMA, Prophet).  
-- Interactive chart + AI narrative generation.  
-- Simple “hedge suggestion” engine.
-
-### Phase 2 (Scaling - 4 months)
-- Live API integrations (Yahoo Finance, Alpha Vantage, CoinGecko).  
-- Portfolio-wide hedging simulations.  
-- Backtesting dashboard with rolling metrics.
-
-### Phase 3 (Enterprise - 6+ months)
-- Risk-adjusted optimization (e.g., mean-variance, CVaR).  
-- Multi-user/team collaboration features.  
-- Compliance-friendly audit logs.  
-
----
 
 ## 📂 Folder Structure (Planned)
